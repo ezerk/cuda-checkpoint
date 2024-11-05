@@ -17,12 +17,12 @@ set -v
 
 #get the PID of counter
 PID=$!
-
+DEMO_DIR=demo
 # wait for counter to bind to the UDP socket
 sleep 1
 
 #send a packet
-echo hello | nc -u localhost 10000 -W 1
+echo hello | nc -u 127.0.0.1 10000 -w 1
 
 # confirm that counter is using the GPU
 nvidia-smi --query --display=PIDS | grep $PID
@@ -34,21 +34,24 @@ cuda-checkpoint --toggle --pid $PID
 nvidia-smi --query --display=PIDS | grep $PID
 
 # create the directory which will hold the checkpoint image
-mkdir -p demo
+mkdir -p $DEMO_DIR
 
 # checkpoint counter
-criu dump --shell-job --images-dir demo --tree $PID
+sudo criu dump -vvvv -o dump.log --display-stats --shell-job --images-dir $DEMO_DIR --tree $PID
 
 # confirm that counter is no longer running
 ps --pid $PID
 
 # restore counter
-criu restore --shell-job --restore-detached --images-dir demo
+sudo criu restore -vvvv -o restore.log --shell-job --restore-detached --images-dir $DEMO_DIR
 
 # resume CUDA
 cuda-checkpoint --toggle --pid $PID
 
+# wait for counter to bind to the UDP socket
+sleep 2
+
 # send another packet
-echo hello | nc -u localhost 10000 -W 1
+echo hello | nc -u 127.0.0.1 10000 -w 1
 
 kill $PID
